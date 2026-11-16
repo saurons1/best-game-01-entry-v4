@@ -7,6 +7,7 @@ import {
   SPRING, RESERVOIR, MILL, WEATHER, DAY_PLANS,
 } from './config.js';
 import { forecastList } from './weather.js';
+import { drawFx } from './particles.js';
 
 function rr(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -55,13 +56,13 @@ function channelPath(ctx, pts, width, color, glow) {
 // Animated flow dashes riding a channel.
 function flowDashes(ctx, pts, offset, color, width) {
   const total = pathLength(pts);
-  const step = 26;
+  const step = 30;
   ctx.strokeStyle = color;
   ctx.lineWidth = width;
   ctx.lineCap = 'round';
   for (let d = (offset % step); d < total; d += step) {
     const p = pointAt(pts, d);
-    const q = pointAt(pts, Math.min(total, d + 11));
+    const q = pointAt(pts, Math.min(total, d + 14));
     ctx.beginPath();
     ctx.moveTo(p[0], p[1]);
     ctx.lineTo(q[0], q[1]);
@@ -92,6 +93,9 @@ export function render(ctx, s) {
   ctx.clearRect(0, 0, W, H);
   drawSky(ctx, s);
   drawValley(ctx, s);
+  // Rain, splashes and coin sparkles were simulated but never painted until
+  // the cover audit: the storm has to be visible, not just scheduled.
+  drawFx(ctx, s);
   drawTopBar(ctx, s);
   drawLeftPanel(ctx, s);
   drawGateBar(ctx, s);
@@ -155,17 +159,69 @@ function drawSky(ctx, s) {
   ctx.lineTo(1160, 210); ctx.lineTo(1280, 260); ctx.lineTo(1280, 360); ctx.lineTo(LEFT_W, 360);
   ctx.closePath();
   ctx.fill();
+  // Drifting mist over the ridge: slow, faint, it keeps the sky alive.
+  for (let i = 0; i < 3; i++) {
+    const mx = ((300 + i * 420 + s.anim * (5 + i * 2)) % (W + 360)) - 180;
+    const my = 150 + i * 42;
+    ctx.fillStyle = `rgba(180, 205, 255, ${0.05 + i * 0.015})`;
+    ctx.beginPath();
+    ctx.ellipse(mx, my, 190 - i * 30, 13 + i * 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   // Valley floor.
   ctx.fillStyle = PALETTE.ground;
   ctx.fillRect(LEFT_W, 330, W - LEFT_W, H - 330 - BOT_H);
   ctx.fillStyle = PALETTE.groundHi;
   for (let i = 0; i < 5; i++) {
-    ctx.globalAlpha = 0.25;
+    ctx.globalAlpha = 0.38;
     ctx.beginPath();
     ctx.ellipse(760, 420 + i * 48, 420 - i * 40, 16, 0, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+  drawPines(ctx, s);
+}
+
+// Pines on the valley floor and the near ridge, hand-placed so they never
+// cover a channel, a town, a field or a label. They fill the empty middle
+// the cover audit caught: dark green silhouettes with snow tips.
+const PINE_SPOTS = [
+  [280, 380, 1.0], [340, 362, 0.8], [520, 382, 1.1], [600, 352, 0.85],
+  [900, 372, 1.0], [1062, 382, 0.85], [1150, 382, 1.05], [1210, 352, 0.8],
+  [300, 470, 1.15], [340, 522, 0.9], [880, 452, 1.0], [1180, 422, 0.95],
+  [700, 602, 0.9], [250, 452, 1.1], [300, 315, 0.9], [500, 312, 1.0],
+  [1000, 316, 0.9], [1180, 312, 1.0], [230, 640, 1.05], [1060, 600, 0.85],
+];
+
+function drawPines(ctx, s) {
+  for (const [x, y, k] of PINE_SPOTS) {
+    const h = 34 * k;
+    const w = 15 * k;
+    const sway = Math.sin(s.anim * 0.9 + x * 0.05) * 1.2;
+    ctx.fillStyle = '#14261e';
+    ctx.beginPath();
+    ctx.moveTo(x + sway, y - h);
+    ctx.lineTo(x - w, y);
+    ctx.lineTo(x + w, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#1d3a2a';
+    ctx.beginPath();
+    ctx.moveTo(x + sway, y - h * 0.62);
+    ctx.lineTo(x - w * 0.8, y - h * 0.12);
+    ctx.lineTo(x + w * 0.8, y - h * 0.12);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#cdd8f2';
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.moveTo(x + sway, y - h);
+    ctx.lineTo(x - w * 0.32, y - h * 0.72);
+    ctx.lineTo(x + w * 0.32, y - h * 0.72);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
 }
 
 function drawValley(ctx, s) {
@@ -210,17 +266,18 @@ function drawChannels(ctx, s) {
   for (const def of GATES) {
     const g = s.gates[def.id];
     const flowing = g.open && g.jam === 0 && g.flow > 0.05;
-    // Dry bed.
-    channelPath(ctx, def.points, 13, '#0d1a30', 0);
-    channelPath(ctx, def.points, 9, PALETTE.channelDry, 0);
-    // Wet glow when water moves.
+    // Dry bed: wider than before so the network reads even with no flow.
+    channelPath(ctx, def.points, 16, '#0d1a30', 0);
+    channelPath(ctx, def.points, 11, PALETTE.channelDry, 0);
+    // Wet glow when water moves: a fat core plus a wide halo, so the network
+    // stays frame-dominant when the shot shrinks to contact-sheet size.
     if (flowing) {
-      const w = 5 + Math.min(6, g.flow);
-      channelPath(ctx, def.points, w + 5, 'rgba(25, 200, 232, 0.35)', 12);
-      channelPath(ctx, def.points, w, PALETTE.channelWet, 10);
-      flowDashes(ctx, def.points, s.anim * 90, '#bdf6ff', 3);
+      const w = 9 + Math.min(8, g.flow);
+      channelPath(ctx, def.points, w + 9, 'rgba(25, 200, 232, 0.5)', 18);
+      channelPath(ctx, def.points, w, PALETTE.channelWet, 16);
+      flowDashes(ctx, def.points, s.anim * 90, '#bdf6ff', 5);
     } else if (g.open && g.jam === 0) {
-      channelPath(ctx, def.points, 6, 'rgba(25, 200, 232, 0.45)', 6);
+      channelPath(ctx, def.points, 8, 'rgba(25, 200, 232, 0.6)', 8);
     }
   }
 }
@@ -329,19 +386,30 @@ function drawTowns(ctx, s) {
       text(ctx, '✕ ABANDONED', t.x, t.y + 26, 11, '#ff5d5d', 'center');
       continue;
     }
-    // Houses with amber windows when watered.
+    // Houses with amber windows when watered: bigger than before, so the
+    // four towns read as the thing you protect even at contact-sheet size.
     const lit = t.watered;
     const cols = ['#7a3b4f', '#4f6b8a', '#8a5a33'];
     for (let i = 0; i < 3; i++) {
-      const hx = t.x - 52 + i * 36;
+      const hx = t.x - 58 + i * 40;
       ctx.fillStyle = cols[i];
-      rr(ctx, hx, t.y - 16, 30, 28, 3); ctx.fill();
+      rr(ctx, hx, t.y - 18, 34, 32, 3); ctx.fill();
       ctx.fillStyle = '#2c1e2e';
-      ctx.beginPath(); ctx.moveTo(hx - 2, t.y - 16); ctx.lineTo(hx + 15, t.y - 30); ctx.lineTo(hx + 32, t.y - 16); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(hx - 2, t.y - 18); ctx.lineTo(hx + 17, t.y - 34); ctx.lineTo(hx + 36, t.y - 18); ctx.closePath(); ctx.fill();
       ctx.fillStyle = lit ? PALETTE.townLight : '#3a3f5c';
-      if (lit) { ctx.shadowColor = PALETTE.townLight; ctx.shadowBlur = 8; }
-      ctx.fillRect(hx + 10, t.y - 6, 9, 9);
+      if (lit) { ctx.shadowColor = PALETTE.townLight; ctx.shadowBlur = 12; }
+      ctx.fillRect(hx + 12, t.y - 6, 10, 10);
       ctx.shadowBlur = 0;
+    }
+    // Chimney smoke over a watered town: a living town, not a static icon.
+    if (lit) {
+      for (let k = 0; k < 2; k++) {
+        const rise = (s.anim * 12 + k * 9) % 18;
+        ctx.fillStyle = `rgba(159, 178, 216, ${0.32 - rise * 0.012})`;
+        ctx.beginPath();
+        ctx.arc(t.x + 46 + Math.sin(s.anim + k * 2) * 2, t.y - 38 - rise, 3.5 + rise * 0.12, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
     text(ctx, t.name, t.x, t.y - 40, 11, PALETTE.ink, 'center');
     // Tank bar + hearts.
@@ -357,16 +425,27 @@ function drawTowns(ctx, s) {
 
 function drawRiver(ctx, s) {
   const flowing = s.gates[5].open && s.gates[5].flow > 0;
+  // Sample the two quadratics so the stroke and the flow dashes share one path.
+  const pts = [[1236, 298]];
+  for (let i = 1; i <= 8; i++) {
+    const t = i / 8;
+    const u = 1 - t;
+    pts.push([u * u * 1236 + 2 * u * t * 1270 + t * t * 1252, u * u * 298 + 2 * u * t * 340 + t * t * 420]);
+  }
+  for (let i = 1; i <= 8; i++) {
+    const t = i / 8;
+    const u = 1 - t;
+    pts.push([u * u * 1252 + 2 * u * t * 1240 + t * t * 1270, u * u * 420 + 2 * u * t * 520 + t * t * 664]);
+  }
+  polyline(ctx, pts);
   ctx.strokeStyle = flowing ? PALETTE.channelWet : PALETTE.channelDry;
-  ctx.lineWidth = flowing ? 12 : 8;
+  ctx.lineWidth = flowing ? 18 : 10;
   ctx.lineCap = 'round';
-  if (flowing) { ctx.shadowColor = PALETTE.channelGlow; ctx.shadowBlur = 12; }
-  ctx.beginPath();
-  ctx.moveTo(1236, 298);
-  ctx.quadraticCurveTo(1270, 340, 1252, 420);
-  ctx.quadraticCurveTo(1240, 520, 1270, 664);
+  ctx.lineJoin = 'round';
+  if (flowing) { ctx.shadowColor = PALETTE.channelGlow; ctx.shadowBlur = 16; }
   ctx.stroke();
   ctx.shadowBlur = 0;
+  if (flowing) flowDashes(ctx, pts, s.anim * 90, '#bdf6ff', 4);
   text(ctx, 'RIVER →', 1236, 640, 11, PALETTE.inkDim, 'center');
 }
 
@@ -436,7 +515,7 @@ function drawTopBar(ctx, s) {
     [`◷ ${Math.max(0, Math.ceil(s.dayLen - s.dayT))}s`, '#eaf2ff'],
     [`¢ ${s.coins}`, PALETTE.gold],
     [`💧 ${Math.floor(s.waterDelivered)}`, '#59e6ff'],
-    [`TOWNS ${watered}/${alive}`, alive === 0 ? '#ff5d5d' : '#eaf2ff'],
+    [`TOWNS ${watered}/4`, alive === 0 ? '#ff5d5d' : '#eaf2ff'],
     [`SCORE ${Math.floor(s.score)}`, '#eaf2ff'],
     [`BEST ${s.best}`, PALETTE.inkDim],
   ];
@@ -507,7 +586,7 @@ function drawLeftPanel(ctx, s) {
   text(ctx, 'VALLEY LOG', 12, cy, 12, PALETTE.inkDim, 'left');
   cy += 16;
   for (const line of s.log.slice(-6)) {
-    text(ctx, line.length > 26 ? line.slice(0, 25) + '…' : line, 12, cy, 10, PALETTE.inkFaint, 'left');
+    text(ctx, line.length > 28 ? line.slice(0, 27) + '…' : line, 12, cy, 10, PALETTE.inkFaint, 'left');
     cy += 14;
   }
   // Controls footnote.
@@ -567,6 +646,10 @@ function drawTitle(ctx, s) {
   text(ctx, 'HEADWATERS', cx, 170, 64, PALETTE.channelGlow, 'center');
   text(ctx, 'hold the valley · mind the water', cx, 212, 18, '#bdf6ff', 'center');
   text(ctx, 'WATER ONLY FLOWS WHERE YOU OPEN IT', cx, 252, 17, PALETTE.gold, 'center');
+  // A solid panel behind the objective text: the living valley behind it
+  // used to show through the scrim and fight the words (the reservoir's
+  // "12/100" ghosted through the paragraph).
+  panel(ctx, cx - 340, 272, 680, 148, PALETTE.cardEdge);
   const lines = [
     'Route the mountain spring through 6 sluice gates to reservoirs, the mill,',
     'the wheat fields and 4 towns. Water a town and it pays coin; leave it dry',
@@ -579,11 +662,12 @@ function drawTitle(ctx, s) {
   text(ctx, 'WIN: survive Day 7 with at least 1 town standing.', cx, 452, 15, PALETTE.ok, 'center');
   text(ctx, 'LOSE: the dam breaks — or every town runs dry.', cx, 478, 15, '#ff8d7a', 'center');
   text(ctx, '▶ PRESS ENTER TO BEGIN ◀', cx, 540, 20, '#ffffff', 'center');
+  panel(ctx, cx - 280, 566, 560, 28, PALETTE.cardEdge);
   text(ctx, '7 days · weather fronts · beaver dams · upgrade drafts · flood boss', cx, 580, 12, PALETTE.inkDim, 'center');
 }
 
 function drawDraftScreen(ctx, s) {
-  ctx.fillStyle = 'rgba(6, 10, 26, 0.78)';
+  ctx.fillStyle = 'rgba(6, 10, 26, 0.85)';
   ctx.fillRect(LEFT_W, TOP_H, W - LEFT_W, H - TOP_H - BOT_H);
   const cx = 740;
   text(ctx, `DAY ${s.day - 1} SURVIVED — CHOOSE AN UPGRADE`, cx, 250, 24, PALETTE.gold, 'center');

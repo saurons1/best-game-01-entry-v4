@@ -46,27 +46,29 @@ export function stageShot(s, scene, seed) {
   }
   if (scene === 'play') {
     startRun(s);
-    // Jump to day 3, storm about to arrive: the cover's pressure moment.
-    s.day = 3;
+    // Jump to day 6, mid-storm: the cover's pressure moment. Rain is falling,
+    // the flood is high enough to show at the valley floor, the spillway is
+    // open, and a beaver dam blocks EAST MAIN — every system visible at once.
+    s.day = 6;
     beginDay(s);
-    s.dayT = 8;
+    s.dayT = 22;
     s.gates[0].open = true; s.gates[1].open = true; s.gates[2].open = true;
-    s.gates[3].open = true; s.gates[4].open = true;
-    s.reservoir.stored = 62;
-    s.flood = 38;
-    s.coins = 47;
-    s.score = 612;
-    s.waterDelivered = 188;
+    s.gates[3].open = false; s.gates[3].jam = 3;
+    s.gates[4].open = true; s.gates[5].open = true;
+    s.reservoir.stored = 88;
+    s.flood = 72;
+    s.coins = 148;
+    s.score = 1840;
+    s.waterDelivered = 520;
     s.towns[0].tank = 16; s.towns[0].watered = true;
-    s.towns[1].tank = 11;
-    s.towns[2].tank = 9;
-    s.towns[3].tank = 4;
+    s.towns[1].tank = 16; s.towns[1].watered = true;
+    s.towns[2].tank = 11;
+    s.towns[3].tank = 6;
     s.farms[0].water = 14; s.farms[0].watered = true;
-    s.farms[1].water = 8;
-    s.selected = 3;
-    s.banner = '⛈ STORM SURGE INCOMING — watch the dam!';
-    s.bannerT = 99;
+    s.farms[1].water = 10;
+    s.selected = 5;
     stepPlain(s, 90);
+    s.banner = '⛈ STORM SURGE — open the SPILLWAY before the dam breaks!';
     s.bannerT = 99;
     return;
   }

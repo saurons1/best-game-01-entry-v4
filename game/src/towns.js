@@ -17,9 +17,9 @@ export function settleDay(s) {
       t.health -= 1;
       if (t.health <= 0) {
         t.lost = true;
-        lines.push(`${t.name} ran dry and was abandoned.`);
+        lines.push(`${t.name} ran dry.`);
       } else {
-        lines.push(`${t.name} went thirsty (${t.health} ♥ left).`);
+        lines.push(`${t.name} thirsty (${t.health}♥).`);
       }
     }
   }
@@ -34,6 +34,7 @@ export function settleDay(s) {
 
   const watered = s.towns.filter((t) => t.watered).length;
   const fields = s.farms.filter((f) => f.watered).length;
-  lines.unshift(`Day ${s.day} ends: ${watered}/4 towns watered, ${fields}/2 fields green, +${coins} coin.`);
+  lines.unshift(`+${coins} coin · ${fields}/2 fields green`);
+  lines.unshift(`Day ${s.day}: ${watered}/4 towns watered`);
   return { coins, lines };
 }

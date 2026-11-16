@@ -93,7 +93,7 @@ export function beginDay(s) {
   for (const t of s.towns) { t.tank = 0; t.watered = false; }
   for (const f of s.farms) { f.water = 0; f.watered = false; }
   s.flood = Math.max(0, s.flood - 12);
-  s.log.push(`Day ${s.day} begins — ${WEATHER[s.weather].label}`);
+  s.log.push(`Day ${s.day} — ${WEATHER[s.weather].label}`);
 }
 
 export function addLog(s, msg) {
@@ -121,7 +121,7 @@ export function clickJam(s, id) {
   if (g.jam <= 0) {
     g.jam = 0;
     s.stats.jamsCleared++;
-    addLog(s, `Cleared the jam on ${GATES[id].name}`);
+    addLog(s, `Jam cleared: ${GATES[id].name}`);
     sfx('clear');
     spawnClearBurst(s, id);
   } else {
@@ -142,7 +142,7 @@ export function applyJam(s, gateId) {
   g.jam = JAM_HP;
   g.open = false;
   setBanner(s, `BEAVER DAM! ${GATES[gateId].name} is blocked — click it to clear.`, 4);
-  addLog(s, `Beaver dam blocks ${GATES[gateId].name}`);
+  addLog(s, `Beaver dam: ${GATES[gateId].name}`);
   s.jamFlash = 1;
   sfx('jam');
 }
